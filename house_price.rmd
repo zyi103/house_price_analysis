@@ -1,1 +1,58 @@
-ss
+```{r}
+library(tidyverse)
+library(fastDummies)
+require(caret)
+```
+
+```{r}
+data <- read.csv('train.csv')
+head(data)
+```
+```{r}
+data <- data[ , -which(names(data) %in% c("PoolQC","MiscFeature","Alley","Fence"))]
+data
+```
+```{r}
+data_with_dummies <- dummy_cols(data,remove_selected_columns=TRUE,remove_most_frequent_dummy = TRUE)
+data_with_dummies
+```
+```{r}
+data_with_dummies <- na.omit(data_with_dummies)
+data_with_dummies
+```
+
+
+```{r}
+smp_size <- floor(.7 * nrow(data_with_dummies))
+train_ind <- sample(seq_len(nrow(data_with_dummies)) , size = smp_size)
+train <- data_with_dummies[train_ind,]
+test <- data_with_dummies[-train_ind,]
+```
+
+## Linear Regression
+```{r}
+lmOut <- lm(SalePrice ~ . ,data = train)
+summary(lmOut)
+```
+
+```{r}
+RSS <- c(crossprod(lmOut$residuals))
+MSE <- RSS / length(lmOut$residuals)
+RMSE <- sqrt(MSE)
+sprintf('The MSE for Linear model is: %s', MSE)
+sprintf('The RMSE for Linear model is: %s', RMSE)
+sprintf('The R^2 for Linear model is: %s', summary(lmOut)$r.squared)
+```
+
+## random forest
+```{r}
+rf = train(SalePrice ~., data = train, 
+      method = "rf",
+      metric = 'RMSE')
+rf
+```
+```{r}
+rf$results
+```
+
+
