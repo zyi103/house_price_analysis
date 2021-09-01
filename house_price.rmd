@@ -2,22 +2,29 @@
 library(tidyverse)
 library(fastDummies)
 require(caret)
+library(naniar)
+library(performance)
+library(ps)
 ```
 
 ```{r}
-data <- read.csv('train.csv')
+data <- read.csv('home_data.csv')f
 head(data)
 ```
 ```{r}
-data <- data[ , -which(names(data) %in% c("PoolQC","MiscFeature","Alley","Fence"))]
+View(miss_var_summary(data))
+```
+
+
+```{r}
+data <- data[ , -which(names(data) %in% c("PoolQC","PoolQCBad","IsPoolQCG","MiscFeature","Alley","Fence","FenceCondB","FenceCondG"))]
 data
 ```
+
+
+
 ```{r}
 data_with_dummies <- dummy_cols(data,remove_selected_columns=TRUE,remove_most_frequent_dummy = TRUE)
-data_with_dummies
-```
-```{r}
-data_with_dummies <- na.omit(data_with_dummies)
 data_with_dummies
 ```
 
@@ -36,6 +43,17 @@ summary(lmOut)
 ```
 
 ```{r}
+coefLmOut <- as.data.frame(summary(lmOut)$coefficients) %>% filter(`Pr(>|t|)` < 0.1)
+options(scipen = 999)
+View(coefLmOut[order(coefLmOut$Estimate,decreasing = TRUE),])
+```
+
+```{r}
+coefLmOut[order(coefLmOut$Estimate,decreasing = TRUE),]
+```
+
+
+```{r}
 RSS <- c(crossprod(lmOut$residuals))
 MSE <- RSS / length(lmOut$residuals)
 RMSE <- sqrt(MSE)
@@ -48,11 +66,45 @@ sprintf('The R^2 for Linear model is: %s', summary(lmOut)$r.squared)
 ```{r}
 rf = train(SalePrice ~., data = train, 
       method = "rf",
-      metric = 'RMSE')
+      metric = 'RMSE',
+)
 rf
 ```
+
 ```{r}
 rf$results
+importance(data_with_dummies,rf)
 ```
 
+```{r}
+posEff <- coefLmOut[order(coefLmOut$Estimate,decreasing = TRUE),][2:6,]
+posEff <- cbind(variables = rownames(posEff), posEff)
+posEff<- posEff[order(posEff$Estimate),]
+
+negEff <- coefLmOut[order(coefLmOut$Estimate),][1:5,]
+negEff <- cbind(variables = rownames(negEff), negEff)
+negEff<- negEff[order(negEff$Estimate,decreasing = TRUE),]
+
+par(mar=c(4, 10, 3, 0.5), mgp=c(0, 0.8, -0.5), cex=0.9)
+
+
+barplot(negEff$Estimate, main="Negative Coeff", horiz=TRUE, font.axis=2, 
+        col.axis="red", 
+        cex.axis=1.5, 
+        las=1,
+        names.arg=rownames(negEff))
+```
+
+```{r}
+data <- read.csv("training_data.csv")
+data$log_SalePrice <- log(data$SalePrice)
+
+data %>% pivot_longer(cols=c(SalePrice,log_SalePrice), names_to = "variable",
+                           values_to = "value", values_drop_na = TRUE) %>%
+  ggplot(aes(x = value, y=..density..)) + geom_histogram(col="black",fill="white") + facet_wrap(~variable, scales="free") +
+    geom_density(alpha=.2, fill="#FF6666") + 
+
+    theme_minimal()
+
+```
 
